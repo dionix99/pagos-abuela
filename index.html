@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0f9d8f">
+<title>Pagos Abuela</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="iconos/icon-192.png">
+<link rel="icon" href="iconos/icon-192.png">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  :root {
+    --verde:#0f9d8f; --verde-os:#0b7c71; --naranja:#f2994a; --rojo:#eb5757;
+    --fondo:#f2f6f5; --tx:#1c2b29; --tx2:#6b7c79; --tarjeta:#ffffff;
+    --borde:#e3ecea; --sombra:0 4px 14px rgba(15,157,143,.10);
+  }
+  html,body { height:100%; }
+  body {
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    background:var(--fondo); color:var(--tx); padding-bottom:76px;
+  }
+  .oculto { display:none !important; }
+
+  /* Header */
+  header {
+    background:linear-gradient(135deg,#0f9d8f,#0b7c71 60%,#0a6a63);
+    color:#fff; padding:18px 16px 58px;
+  }
+  .head-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .head-row h1 { font-size:20px; letter-spacing:.3px; }
+  .head-row .sub { font-size:12px; opacity:.9; margin-top:2px; }
+  .btn-actualizar {
+    background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.35);
+    color:#fff; border-radius:20px; padding:8px 14px; font-size:13px; cursor:pointer;
+  }
+  .totales {
+    display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;
+  }
+  .tcard {
+    background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.2);
+    border-radius:14px; padding:10px 14px; min-width:104px; flex:1;
+  }
+  .tcard .lbl { font-size:11px; opacity:.85; }
+  .tcard .val { font-size:17px; font-weight:700; margin-top:2px; }
+  .tcard .det { font-size:11px; opacity:.8; margin-top:1px; }
+
+  /* Pestañas */
+  nav.tabs {
+    position:sticky; top:0; z-index:30; background:var(--fondo);
+    display:flex; gap:8px; padding:10px 12px; border-bottom:1px solid var(--borde);
+  }
+  .tab-btn {
+    flex:1; border:none; background:#fff; color:var(--tx2);
+    border:1px solid var(--borde); border-radius:12px; padding:12px 6px; font-size:14px;
+    font-weight:600; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.04);
+  }
+  .tab-btn.activo { background:var(--verde); color:#fff; border-color:var(--verde); }
+
+  main { max-width:640px; margin:0 auto; padding:14px 12px; }
+
+  .tarjeta {
+    background:var(--tarjeta); border:1px solid var(--borde); border-radius:16px;
+    padding:16px; box-shadow:var(--sombra); margin-bottom:14px;
+  }
+  .tarjeta h2 { font-size:16px; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .tarjeta .desc { font-size:12.5px; color:var(--tx2); margin-bottom:12px; }
+
+  .campo { margin-bottom:12px; }
+  .campo label { display:block; font-size:12.5px; font-weight:600; color:var(--tx2); margin-bottom:5px; }
+  .campo input, .campo select, .campo textarea {
+    width:100%; border:1.5px solid var(--borde); border-radius:10px; padding:11px 12px;
+    font-size:15px; background:#fbfdfc; color:var(--tx); outline:none;
+  }
+  .campo input:focus, .campo select:focus, .campo textarea:focus {
+    border-color:var(--verde); background:#fff;
+  }
+  .campo textarea { resize:vertical; min-height:52px; }
+  .fila { display:flex; gap:10px; }
+  .fila .campo { flex:1; }
+
+  .refer-num {
+    font-size:22px !important; font-weight:700; letter-spacing:6px; text-align:center;
+  }
+
+  /* Foto */
+  .foto-area {
+    border:2px dashed var(--borde); border-radius:12px; padding:14px; text-align:center;
+    background:#fbfdfc;
+  }
+  .foto-area .foto-preview {
+    width:100%; max-height:240px; object-fit:cover; border-radius:10px; display:none;
+  }
+  .foto-area.activa { border-style:solid; border-color:var(--verde); }
+  .foto-btn {
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    border:none; background:var(--verde); color:#fff; border-radius:10px;
+    padding:13px; font-size:14.5px; font-weight:600; cursor:pointer; margin-top:10px;
+  }
+  .foto-btn.quitar { background:#dceeeb; color:var(--rojo); }
+  .foto-botones { display:flex; gap:8px; margin-top:10px; }
+  .foto-botones .foto-btn { flex:1; width:auto; margin-top:0; padding:13px 8px; font-size:13.5px; }
+  .foto-btn.secundario { background:#dceeeb; color:var(--verde-os); }
+
+  .btn-registrar, .btn-guardar-pin {
+    width:100%; border:none; border-radius:14px; padding:15px; font-size:16px;
+    font-weight:700; color:#fff; background:linear-gradient(135deg,var(--naranja),#e07c26);
+    cursor:pointer; box-shadow:0 4px 14px rgba(242,153,74,.35);
+  }
+  .btn-registrar:active { transform:scale(.98); }
+
+  /* Historial */
+  .filtros { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .filtros button {
+    border:1px solid var(--borde); background:#fff; border-radius:20px; padding:8px 14px;
+    font-size:13px; color:var(--tx2); cursor:pointer; font-weight:600;
+  }
+  .filtros button.activo { background:var(--verde); color:#fff; border-color:var(--verde); }
+
+  /* Semanas */
+  .semana { margin-bottom:14px; }
+  .sem-cab {
+    background:linear-gradient(135deg,var(--verde),var(--verde-os));
+    color:#fff; border-radius:12px; padding:9px 12px; font-size:13.5px;
+    font-weight:700; margin-bottom:10px;
+  }
+  .sem-tots { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .sem-tot {
+    flex:1; min-width:130px; background:#eef6f4; border:1px solid var(--borde);
+    border-radius:10px; padding:7px 10px; font-size:11.5px; color:var(--tx2);
+  }
+  .sem-tot b { color:var(--tx); font-size:12.5px; }
+  .sem-tot i { font-style:normal; display:block; margin-top:2px; }
+
+  .item {
+    background:#fff; border:1px solid var(--borde); border-radius:14px; padding:12px;
+    margin-bottom:10px; display:flex; gap:12px; box-shadow:0 2px 8px rgba(0,0,0,.03);
+  }
+  .item .mini-foto {
+    width:64px; height:64px; border-radius:10px; object-fit:cover; flex-shrink:0;
+    border:1px solid var(--borde);
+  }
+  .item .sin-foto {
+    width:64px; height:64px; border-radius:10px; background:#eef5f3; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:26px;
+  }
+  .item .info { flex:1; min-width:0; }
+  .item .info .row1 { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .item .monto { font-size:18px; font-weight:800; }
+  .item .dir { font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff; }
+  .dir.recibido { background:var(--verde); }
+  .dir.dado { background:var(--naranja); }
+  .item .det { font-size:12.5px; color:var(--tx2); margin-top:4px; line-height:1.5; }
+  .item .det b { color:var(--tx); }
+  .item .nota { font-size:12.5px; margin-top:4px; color:var(--tx); }
+  .item .borrar {
+    background:none; border:none; color:var(--rojo); font-size:12px; font-weight:700;
+    cursor:pointer; margin-top:6px; padding:0;
+  }
+  .vacio { text-align:center; color:var(--tx2); padding:38px 10px; font-size:14px; }
+  .vacio .ico { font-size:44px; display:block; margin-bottom:10px; opacity:.5; }
+
+  /* Pantalla PIN */
+  #pantallaPin {
+    position:fixed; inset:0; z-index:100; background:linear-gradient(135deg,#0f9d8f,#0a6a63);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .pin-box {
+    background:#fff; border-radius:20px; padding:26px 22px; width:100%; max-width:340px;
+    text-align:center; box-shadow:0 12px 34px rgba(0,0,0,.25);
+  }
+  .pin-box .logo { font-size:46px; }
+  .pin-box h2 { font-size:19px; margin:8px 0 4px; }
+  .pin-box p { font-size:13px; color:var(--tx2); margin-bottom:16px; }
+  .pin-box input {
+    width:100%; text-align:center; font-size:26px; letter-spacing:10px; font-weight:800;
+    border:2px solid var(--borde); border-radius:12px; padding:12px; outline:none;
+  }
+  .pin-box input:focus { border-color:var(--verde); }
+  .pin-err { color:var(--rojo); font-size:12.5px; margin-top:8px; min-height:16px; font-weight:600; }
+
+  .toast {
+    position:fixed; bottom:86px; left:50%; transform:translateX(-50%);
+    background:#1c2b29; color:#fff; padding:11px 18px; border-radius:24px; font-size:13.5px;
+    z-index:90; box-shadow:0 6px 18px rgba(0,0,0,.25); display:none; max-width:88%;
+    text-align:center;
+  }
+
+  footer.barra {
+    position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--borde);
+    display:flex; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); z-index:40;
+  }
+  footer.barra a {
+    flex:1; text-align:center; text-decoration:none; color:var(--tx2); font-size:11px; font-weight:600;
+  }
+  footer.barra .ico { font-size:20px; display:block; margin-bottom:1px; }
+</style>
+</head>
+<body>
+
+<!-- Pantalla PIN -->
+<div id="pantallaPin">
+  <div class="pin-box">
+    <div class="logo">💸</div>
+    <h2>Pagos Abuela</h2>
+    <p>Ingresa tu PIN para entrar</p>
+    <input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••">
+    <div class="pin-err" id="pinErr"></div>
+    <button class="btn-guardar-pin" id="btnPin" style="margin-top:8px; background:linear-gradient(135deg,#0f9d8f,#0b7c71)">Entrar</button>
+  </div>
+</div>
+
+<header>
+  <div class="head-row">
+    <div>
+      <h1>💸 Pagos Abuela</h1>
+      <div class="sub" id="subEstado">Cargando...</div>
+    </div>
+    <button class="btn-actualizar" id="btnActualizar">🔄 Actualizar</button>
+  </div>
+  <div class="totales" id="totales"></div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn activo" data-tab="recibido">📥 Recibí</button>
+  <button class="tab-btn" data-tab="dado">📤 Pagué</button>
+  <button class="tab-btn" data-tab="historial">📋 Historial</button>
+</nav>
+
+<main>
+  <!-- Formulario Recibí -->
+  <section id="tab-recibido" class="tarjeta">
+    <h2>📥 Registro de pago que <span style="color:var(--verde)">recibí</span></h2>
+    <div class="desc">Cuando tu abuela te pague, anota aquí el monto, la referencia de 4 números y una foto.</div>
+
+    <div class="fila">
+      <div class="campo">
+        <label>Monto</label>
+        <input id="r-monto" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div class="campo" style="flex:0 0 105px;">
+        <label>Moneda</label>
+        <select id="r-moneda">
+          <option value="Bs" selected>Bs</option>
+          <option value="USD">USD</option>
+          <option value="COP">COP</option>
+          <option value="EUR">EUR</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="campo">
+      <label>Referencia (4 números)</label>
+      <input id="r-ref" class="refer-num" type="text" inputmode="numeric" maxlength="4" placeholder="0000">
+    </div>
+
+    <div class="fila">
+      <div class="campo">
+        <label>Fecha</label>
+        <input id="r-fecha" type="date">
+      </div>
+      <div class="campo">
+        <label>Hora</label>
+        <input id="r-hora" type="time">
+      </div>
+    </div>
+
+    <div class="campo">
+      <label>Nota (opcional)</label>
+      <input id="r-nota" type="text" maxlength="200" placeholder="Ej: efectivo en banco">
+    </div>
+
+    <div class="campo">
+      <label>Foto del pago (opcional)</label>
+      <div class="foto-area" id="foto-area-recibido">
+        <img id="foto-preview-recibido" class="foto-preview" alt="">
+        <input id="foto-cam-recibido" type="file" accept="image/*" capture="environment" style="display:none">
+        <input id="foto-gal-recibido" type="file" accept="image/*" style="display:none">
+        <div class="foto-botones" id="foto-botones-recibido">
+          <button type="button" class="foto-btn" id="foto-cam-btn-recibido">📷 Tomar foto</button>
+          <button type="button" class="foto-btn secundario" id="foto-gal-btn-recibido">🖼️ Galería</button>
+        </div>
+        <button type="button" class="foto-btn quitar" id="foto-quitar-recibido" style="display:none">🗑 Quitar foto</button>
+      </div>
+    </div>
+
+    <button class="btn-registrar" id="btn-enviar-recibido">✅ Registrar pago recibido</button>
+  </section>
+
+  <!-- Formulario Pagué -->
+  <section id="tab-dado" class="tarjeta oculto">
+    <h2>📤 Registro de pago que <span style="color:var(--naranja)">realicé</span></h2>
+    <div class="desc">Cuando le pagues a tu abuela, anota aquí el monto, la referencia de 4 números y una foto.</div>
+
+    <div class="fila">
+      <div class="campo">
+        <label>Monto</label>
+        <input id="d-monto" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div class="campo" style="flex:0 0 105px;">
+        <label>Moneda</label>
+        <select id="d-moneda">
+          <option value="Bs" selected>Bs</option>
+          <option value="USD">USD</option>
+          <option value="COP">COP</option>
+          <option value="EUR">EUR</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="campo">
+      <label>Referencia (4 números)</label>
+      <input id="d-ref" class="refer-num" type="text" inputmode="numeric" maxlength="4" placeholder="0000">
+    </div>
+
+    <div class="fila">
+      <div class="campo">
+        <label>Fecha</label>
+        <input id="d-fecha" type="date">
+      </div>
+      <div class="campo">
+        <label>Hora</label>
+        <input id="d-hora" type="time">
+      </div>
+    </div>
+
+    <div class="campo">
+      <label>Nota (opcional)</label>
+      <input id="d-nota" type="text" maxlength="200" placeholder="Ej: pago quincena">
+    </div>
+
+    <div class="campo">
+      <label>Foto del pago (opcional)</label>
+      <div class="foto-area" id="foto-area-dado">
+        <img id="foto-preview-dado" class="foto-preview" alt="">
+        <input id="foto-cam-dado" type="file" accept="image/*" capture="environment" style="display:none">
+        <input id="foto-gal-dado" type="file" accept="image/*" style="display:none">
+        <div class="foto-botones" id="foto-botones-dado">
+          <button type="button" class="foto-btn" id="foto-cam-btn-dado">📷 Tomar foto</button>
+          <button type="button" class="foto-btn secundario" id="foto-gal-btn-dado">🖼️ Galería</button>
+        </div>
+        <button type="button" class="foto-btn quitar" id="foto-quitar-dado" style="display:none">🗑 Quitar foto</button>
+      </div>
+    </div>
+
+    <button class="btn-registrar" id="btn-enviar-dado">✅ Registrar pago realizado</button>
+  </section>
+
+  <!-- Historial -->
+  <section id="tab-historial" class="oculto">
+    <div class="filtros" id="filtros">
+      <button class="activo" data-f="todos">Todos</button>
+      <button data-f="recibido">Recibidos</button>
+      <button data-f="dado">Pagué</button>
+      <button data-f="semana">📅 Esta semana</button>
+    </div>
+    <div id="lista" class="vacio" style="display:none"></div>
+  </section>
+</main>
+
+<footer class="barra">
+  <a data-tab="recibido"><span class="ico">📥</span>Recibí</a>
+  <a data-tab="dado"><span class="ico">📤</span>Pagué</a>
+  <a data-tab="historial"><span class="ico">📋</span>Historial</a>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var PIN = null;
+  var pagos = [];
+  var filtroDir = 'todos';
+  var fotosSeleccionadas = { recibido: null, dado: null };
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function ahoraLocal() {
+    var d = new Date();
+    var f = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    var h = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return { fecha: f, hora: h };
+  }
+  function fmt(n) {
+    return Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    clearTimeout(t._tm);
+    t._tm = setTimeout(function () { t.style.display = 'none'; }, 2600);
+  }
+
+  /* ---------- Código único por pago ---------- */
+  function nuevoUid() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    return 'p' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
+  /* ---------- Cola offline (IndexedDB) ---------- */
+  var DB_NOMBRE = 'pagos_abuela';
+  var DB_STORE = 'pendientes';
+  var dbPromise = null;
+  function abrirDB() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function (resolve, reject) {
+      var req = indexedDB.open(DB_NOMBRE, 1);
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath: 'uid' });
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+    return dbPromise;
+  }
+  function colaPoner(pago) {
+    return abrirDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).put(pago);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+  function colaLeer() {
+    return abrirDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(DB_STORE, 'readonly');
+        var req = tx.objectStore(DB_STORE).getAll();
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function () { reject(req.error); };
+      });
+    });
+  }
+  function colaQuitar(uid) {
+    return abrirDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).delete(uid);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+
+  var pendientes = [];
+  function cargarPendientes() {
+    return colaLeer().then(function (lista) {
+      pendientes = lista || [];
+      renderEstado();
+      renderLista();
+    }).catch(function () {});
+  }
+
+  function fetchTimeout(url, opciones, ms) {
+    var ctrl = new AbortController();
+    var t = setTimeout(function () { ctrl.abort(); }, ms);
+    opciones = opciones || {};
+    opciones.signal = ctrl.signal;
+    return fetch(url, opciones).then(function (r) { clearTimeout(t); return r; },
+      function (e) { clearTimeout(t); throw e; });
+  }
+
+  var sincronizando = false;
+  function sincronizar() {
+    if (sincronizando || !PIN) return Promise.resolve(0);
+    sincronizando = true;
+    var antes = pendientes.length;
+    return colaLeer().then(function (lista) {
+      pendientes = lista || [];
+      return pendientes.reduce(function (cadena, pago) {
+        return cadena.then(function () { return enviarUno(pago); });
+      }, Promise.resolve());
+    }).then(function () {
+      return colaLeer();
+    }).then(function (lista) {
+      pendientes = lista || [];
+      var subidos = antes - pendientes.length;
+      if (subidos > 0) toast('☁ Se subieron ' + subidos + ' pago' + (subidos === 1 ? '' : 's') + ' a la PC');
+    }).catch(function () {}).then(function () {
+      sincronizando = false;
+      return actualizarDatos();
+    });
+  }
+
+  function enviarUno(pago) {
+    var body = JSON.stringify({
+      uid: pago.uid, direccion: pago.direccion, monto: pago.monto, moneda: pago.moneda,
+      referencia: pago.referencia, fecha: pago.fecha, hora: pago.hora, nota: pago.nota, foto: pago.foto
+    });
+    function intento(n) {
+      return fetchTimeout('/api/pagar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Pin': PIN },
+        body: body
+      }, 15000).then(function (r) {
+        if (r.status === 401) return { tipo: 'pin' };
+        if (r.ok) return { tipo: 'ok' };
+        return r.json().then(function (d) { return { tipo: 'error', msg: (d && d.error) || 'datos inválidos' }; })
+          .catch(function () { return { tipo: 'error', msg: 'datos inválidos' }; });
+      }).catch(function () {
+        if (n < 3) return new Promise(function (res) { setTimeout(res, 1000 * n); }).then(function () { return intento(n + 1); });
+        return { tipo: 'red' };
+      });
+    }
+    return intento(1).then(function (res) {
+      if (res.tipo === 'ok') return colaQuitar(pago.uid);
+      if (res.tipo === 'error') return colaQuitar(pago.uid).then(function () { toast('⚠ ' + res.msg); });
+      if (res.tipo === 'pin') { toast('PIN incorrecto'); return; }
+      return;
+    });
+  }
+
+  var syncArrancada = false;
+  function arrancarSync() {
+    cargarPendientes().then(function () { sincronizar(); });
+    if (syncArrancada) return;
+    syncArrancada = true;
+    window.addEventListener('online', function () { toast('🌐 Conexión restablecida'); sincronizar(); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) sincronizar(); });
+    setInterval(function () { sincronizar(); }, 30000);
+  }
+
+  /* ---------- PIN ---------- */
+  function entrar() {
+    var val = $('pinInput').value.trim();
+    if (!val) { $('pinErr').textContent = 'Escribe tu PIN'; return; }
+    fetch('/api/pagos', { headers: { 'X-Pin': val } })
+      .then(function (r) {
+        if (r.status === 401) { $('pinErr').textContent = 'PIN incorrecto'; return Promise.reject('bad pin'); }
+        if (!r.ok) throw new Error('error');
+        return r.json();
+      })
+      .then(function (datos) {
+        PIN = val;
+        sessionStorage.setItem('pagos_pin', val);
+        $('pinInput').value = '';
+        $('pantallaPin').classList.add('oculto');
+        pagos = datos.pagos || [];
+        renderTotales(datos.totales || []);
+        renderLista();
+        $('subEstado').textContent = pagos.length + ' pagos guardados en tu PC';
+        toast('¡Bienvenido/a! 👋');
+        arrancarSync();
+      })
+      .catch(function () {});
+  }
+  var sesionPin = sessionStorage.getItem('pagos_pin');
+  if (sesionPin) {
+    fetch('/api/pagos', { headers: { 'X-Pin': sesionPin } })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (datos) {
+        PIN = sesionPin;
+        $('pantallaPin').classList.add('oculto');
+        pagos = datos.pagos || [];
+        renderTotales(datos.totales || []);
+        renderLista();
+        $('subEstado').textContent = pagos.length + ' pagos guardados en tu PC';
+        arrancarSync();
+      })
+      .catch(function () { sessionStorage.removeItem('pagos_pin'); });
+  }
+
+  $('pinInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') entrar();
+  });
+  $('btnPin').addEventListener('click', entrar);
+
+  /* ---------- Definición de fichas con foto ---------- */
+  var fotoListo = {};
+  function resetFoto(tipo) {
+    fotosSeleccionadas[tipo] = null;
+    var cam = $('foto-cam-' + tipo), gal = $('foto-gal-' + tipo);
+    if (cam) cam.value = '';
+    if (gal) gal.value = '';
+    var prev = $('foto-preview-' + tipo);
+    if (prev) { prev.src = ''; prev.style.display = 'none'; }
+    var area = $('foto-area-' + tipo);
+    if (area) area.classList.remove('activa');
+    var botones = $('foto-botones-' + tipo);
+    if (botones) botones.style.display = 'flex';
+    var quitar = $('foto-quitar-' + tipo);
+    if (quitar) quitar.style.display = 'none';
+  }
+  function montarFoto(tipo) {
+    if (fotoListo[tipo]) return;
+    fotoListo[tipo] = true;
+    var camInput = $('foto-cam-' + tipo);
+    var galInput = $('foto-gal-' + tipo);
+    var botones = $('foto-botones-' + tipo);
+    var quitarBtn = $('foto-quitar-' + tipo);
+
+    function elegir(file) {
+      if (!file) return;
+      comprimirFoto(file).then(function (dataUrl) {
+        fotosSeleccionadas[tipo] = dataUrl;
+        var prev = $('foto-preview-' + tipo);
+        prev.src = dataUrl;
+        prev.style.display = 'block';
+        $('foto-area-' + tipo).classList.add('activa');
+        botones.style.display = 'none';
+        quitarBtn.style.display = 'flex';
+      }).catch(function () { toast('No se pudo leer la foto'); });
+    }
+
+    $('foto-cam-btn-' + tipo).addEventListener('click', function () { camInput.click(); });
+    $('foto-gal-btn-' + tipo).addEventListener('click', function () { galInput.click(); });
+    camInput.addEventListener('change', function () { elegir(camInput.files && camInput.files[0]); camInput.value = ''; });
+    galInput.addEventListener('change', function () { elegir(galInput.files && galInput.files[0]); galInput.value = ''; });
+    quitarBtn.addEventListener('click', function () { resetFoto(tipo); });
+  }
+
+  function comprimirFoto(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onerror = function () { reject(reader.error); };
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onerror = function () { reject(new Error('img')); };
+        img.onload = function () {
+          var MAX = 1280;
+          var LIMITE = 3.2 * 1024 * 1024;
+          var escala = Math.min(1, MAX / Math.max(img.width, img.height));
+          var w = Math.round(img.width * escala);
+          var h = Math.round(img.height * escala);
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          var calidad = 0.72;
+          var dataUrl = canvas.toDataURL('image/jpeg', calidad);
+          var vueltas = 0;
+          while (dataUrl.length > LIMITE && vueltas < 10) {
+            vueltas++;
+            if (calidad > 0.4) {
+              calidad -= 0.08;
+            } else {
+              w = Math.max(300, Math.round(w * 0.8));
+              h = Math.max(300, Math.round(h * 0.8));
+              canvas.width = w; canvas.height = h;
+              ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+            }
+            dataUrl = canvas.toDataURL('image/jpeg', calidad);
+          }
+          resolve(dataUrl);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ---------- Pestañas ---------- */
+  function switchTab(nombre) {
+    ['recibido', 'dado', 'historial'].forEach(function (t) {
+      $('tab-' + t).classList.toggle('oculto', t !== nombre);
+      var b = document.querySelector('.tab-btn[data-tab="' + t + '"]');
+      var a = document.querySelector('footer.barra a[data-tab="' + t + '"]');
+      if (b) b.classList.toggle('activo', t === nombre);
+      if (a) a.style.color = t === nombre ? 'var(--verde)' : '';
+    });
+    if (nombre === 'historial') { renderLista(); renderTotalesTot(); }
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('.tab-btn').forEach(function (b) {
+    b.addEventListener('click', function () { switchTab(b.dataset.tab); });
+  });
+  document.querySelectorAll('footer.barra a').forEach(function (a) {
+    a.addEventListener('click', function () { switchTab(a.dataset.tab); });
+  });
+
+  /* ---------- Enviar ---------- */
+  function enviar(direccion) {
+    var p = direccion === 'recibido' ? 'r' : 'd';
+    var monto = parseFloat($(p + '-monto').value);
+    if (!(monto > 0)) { toast('Escribe un monto válido'); return; }
+    var referencia = $(p + '-ref').value.trim();
+    if (!/^\d{4}$/.test(referencia)) { toast('La referencia debe ser de 4 números'); return; }
+    var fecha = $(p + '-fecha').value || ahoraLocal().fecha;
+    var hora = $(p + '-hora').value || ahoraLocal().hora;
+
+    var boton = $('btn-enviar-' + direccion);
+    boton.disabled = true;
+    boton.textContent = '⏳ Guardando...';
+
+    var body = {
+      direccion: direccion,
+      monto: monto,
+      moneda: $(p + '-moneda').value,
+      referencia: referencia,
+      fecha: fecha,
+      hora: hora,
+      nota: $(p + '-nota').value.trim(),
+      foto: fotosSeleccionadas[direccion] || null
+    };
+
+    fetch('/api/pagar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Pin': PIN },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        boton.disabled = false;
+        boton.textContent = direccion === 'recibido' ? '✅ Registrar pago recibido' : '✅ Registrar pago realizado';
+        if (!res.ok) { toast(res.d.error || 'Error al guardar'); return; }
+        toast(direccion === 'recibido' ? '✅ Pago recibido guardado' : '✅ Pago realizado guardado');
+        $(p + '-monto').value = '';
+        $(p + '-ref').value = '';
+        $(p + '-nota').value = '';
+        resetFoto(direccion);
+        actualizarDatos();
+      })
+      .catch(function () {
+        boton.disabled = false;
+        boton.textContent = direccion === 'recibido' ? '✅ Registrar pago recibido' : '✅ Registrar pago realizado';
+        toast('Sin conexión con la PC');
+      });
+  }
+
+  $('btn-enviar-recibido').addEventListener('click', function () { enviar('recibido'); });
+  $('btn-enviar-dado').addEventListener('click', function () { enviar('dado'); });
+
+  /* ---------- Datos y totales ---------- */
+  function actualizarDatos() {
+    return fetch('/api/pagos', { headers: { 'X-Pin': PIN } })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (datos) {
+        pagos = datos.pagos || [];
+        renderTotales(datos.totales || []);
+        renderLista();
+        $('subEstado').textContent = pagos.length + ' pagos guardados en tu PC';
+      })
+      .catch(function () { toast('No se pudo actualizar'); });
+  }
+  $('btnActualizar').addEventListener('click', actualizarDatos);
+
+  function renderTotales(totales) {
+    var cont = $('totales');
+    cont.innerHTML = '';
+    if (!totales || !totales.length) {
+      cont.innerHTML = '<div class="tcard"><div class="lbl">Sin registros</div><div class="val">0</div></div>';
+      return;
+    }
+    totales.forEach(function (t) {
+      var d = document.createElement('div');
+      d.className = 'tcard';
+      d.innerHTML = '<div class="lbl">Saldo en ' + t.moneda + '</div>' +
+        '<div class="val" style="color:' + (t.saldo >= 0 ? '#b7f3ea' : '#ffd0a8') + '">' + fmt(t.saldo) + ' ' + t.moneda + '</div>' +
+        '<div class="det">Recibido ' + fmt(t.recibido) + ' · Dado ' + fmt(t.dado) + '</div>';
+      cont.appendChild(d);
+    });
+  }
+  function renderTotalesTot() {
+    fetch('/api/pagos', { headers: { 'X-Pin': PIN } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) renderTotales(d.totales || []); });
+  }
+
+  /* ---------- Lista ---------- */
+  var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  function parseFecha(fs) {
+    var parts = String(fs || '').split('-');
+    var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    return isNaN(d.getTime()) ? new Date() : d;
+  }
+  function lunesDe(fs) {
+    var d = parseFecha(fs);
+    var dia = d.getDay();
+    d.setDate(d.getDate() + (dia === 0 ? -6 : 1 - dia));
+    return d;
+  }
+  function domingoDe(fs) {
+    var d = lunesDe(fs);
+    d.setDate(d.getDate() + 6);
+    return d;
+  }
+  function claveSemana(fs) {
+    var d = lunesDe(fs);
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + dd;
+  }
+
+  function renderLista() {
+    var cont = $('lista');
+    var base;
+    if (filtroDir === 'semana') {
+      var hoy = claveSemana(ahoraLocal().fecha);
+      base = pagos.filter(function (p) { return claveSemana(p.fecha) === hoy; });
+    } else if (filtroDir === 'todos') {
+      base = pagos;
+    } else {
+      base = pagos.filter(function (p) { return p.direccion === filtroDir; });
+    }
+    if (!base.length) {
+      cont.style.display = 'block';
+      cont.className = 'vacio';
+      var ftext = filtroDir === 'todos' ? '' : (filtroDir === 'recibido' ? ' recibidos' : (filtroDir === 'dado' ? ' realizados' : ' esta semana'));
+      cont.innerHTML = '<span class="ico">📭</span>No hay pagos' + ftext + ' todavía.<br><small style="color:#8ca19d">Usa las pestañas Recibí / Pagué.</small>';
+      return;
+    }
+
+    var grupos = {};
+    base.forEach(function (p) {
+      var c = claveSemana(p.fecha);
+      if (!grupos[c]) grupos[c] = [];
+      grupos[c].push(p);
+    });
+    var claves = Object.keys(grupos).sort().reverse();
+
+    cont.style.display = 'block';
+    cont.className = '';
+    cont.innerHTML = claves.map(function (c) {
+      var lista = grupos[c];
+      var lunes = lunesDe(c);
+      var domingo = domingoDe(c);
+      var monedas = [];
+      lista.forEach(function (p) {
+        var m = null;
+        for (var i = 0; i < monedas.length; i++) {
+          if (monedas[i].moneda === p.moneda) { m = monedas[i]; break; }
+        }
+        if (!m) { m = { moneda: p.moneda, recibido: 0, dado: 0 }; monedas.push(m); }
+        if (p.direccion === 'recibido') m.recibido += Number(p.monto) || 0;
+        else m.dado += Number(p.monto) || 0;
+      });
+      var chips = monedas.map(function (m) {
+        var saldo = m.recibido - m.dado;
+        return '<span class="sem-tot"><b>' + m.moneda + ':</b> Saldo ' + fmt(saldo) +
+          '<i>Recibido ' + fmt(m.recibido) + ' · Dado ' + fmt(m.dado) + '</i></span>';
+      }).join('');
+      var titulo = '📅 Semana del ' + lunes.getDate() + ' al ' + domingo.getDate() + ' ' + MESES[domingo.getMonth()] + ' ' + domingo.getFullYear();
+      var items = lista.map(function (p) {
+        var fotoHtml = p.foto
+          ? '<img class="mini-foto" src="' + p.foto + '" alt="pago" loading="lazy">'
+          : '<div class="sin-foto">💵</div>';
+        var dirTxt = p.direccion === 'recibido' ? 'RECIBÍ' : 'PAGUÉ';
+        var cls = p.direccion === 'recibido' ? 'recibido' : 'dado';
+        return '<div class="item">' + fotoHtml +
+          '<div class="info">' +
+            '<div class="row1"><span class="monto">' + fmt(p.monto) + ' ' + p.moneda + '</span>' +
+            '<span class="dir ' + cls + '">' + dirTxt + '</span></div>' +
+            '<div class="det"><b>Ref:</b> ' + p.referencia + ' · ' + p.fecha + ' ' + (p.hora || '') + '</div>' +
+            (p.nota ? '<div class="nota">📝 ' + esc(p.nota) + '</div>' : '') +
+            '<button class="borrar" data-id="' + p.id + '">🗑 Eliminar</button>' +
+          '</div></div>';
+      }).join('');
+      return '<div class="semana"><div class="sem-cab">' + titulo + '</div>' +
+        '<div class="sem-tots">' + chips + '</div>' + items + '</div>';
+    }).join('');
+
+    cont.querySelectorAll('.borrar').forEach(function (b) {
+      b.addEventListener('click', function () { eliminar(b.dataset.id); });
+    });
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function eliminar(id) {
+    var p = pagos.find(function (x) { return x.id === id; });
+    if (!p) return;
+    if (!confirm('Eliminar este pago de ' + fmt(p.monto) + ' ' + p.moneda + '?\nSe borrará también su foto.')) return;
+    fetch('/api/pagos?id=' + encodeURIComponent(id), { method: 'DELETE', headers: { 'X-Pin': PIN } })
+      .then(function (r) { return r.ok ? actualizarDatos() : Promise.reject(); })
+      .then(function () { toast('Pago eliminado'); })
+      .catch(function () { toast('No se pudo eliminar'); });
+  }
+
+  /* ---------- Filtros ---------- */
+  document.querySelectorAll('#filtros button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#filtros button').forEach(function (x) { x.classList.remove('activo'); });
+      b.classList.add('activo');
+      filtroDir = b.dataset.f;
+      renderLista();
+    });
+  });
+
+  /* ---------- Init ---------- */
+  var a = ahoraLocal();
+  $('r-fecha').value = a.fecha; $('r-hora').value = a.hora;
+  $('d-fecha').value = a.fecha; $('d-hora').value = a.hora;
+  ['recibido', 'dado'].forEach(montarFoto);
+})();
+</script>
+</body>
+</html>

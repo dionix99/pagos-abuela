@@ -1,0 +1,15 @@
+{
+  "name": "Pagos Abuela",
+  "short_name": "Pagos",
+  "description": "Registro de los pagos recibidos y realizados con mi abuela, con referencia de 4 números y foto.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f6f5",
+  "theme_color": "#0f9d8f",
+  "lang": "es",
+  "icons": [
+    { "src": "iconos/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "iconos/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "iconos/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "pagos-abuela",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "App Pagos Abuela en la nube (Vercel + Supabase): registro de pagos con referencia y foto.",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo \"No build step required\""
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
