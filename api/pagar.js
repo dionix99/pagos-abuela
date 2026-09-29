@@ -1,24 +1,8 @@
 import { randomBytes } from 'node:crypto';
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const APP_PIN = process.env.APP_PIN || '0505';
+import { SUPABASE_URL, sbHeaders, autorizar } from './_lib.js';
+
 const BUCKET = 'foto';
-
-function pinOk(req) {
-  const header = req.headers['x-pin'] || '';
-  const qs = req.url.split('?')[1] || '';
-  const m = qs.match(/(?:^|&)pin=([^&]+)/);
-  const qpin = m ? decodeURIComponent(m[1]) : '';
-  return String(header) === String(APP_PIN) || String(qpin) === String(APP_PIN);
-}
-
-function sbHeaders(extra) {
-  return Object.assign(
-    { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY },
-    extra || {}
-  );
-}
 
 function leerCuerpo(req) {
   if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
@@ -56,11 +40,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'método no permitido' }); return; }
 
-  if (!pinOk(req)) { res.status(401).json({ ok: false, error: 'PIN incorrecto' }); return; }
-  if (!SUPABASE_URL || !SERVICE_KEY) {
-    res.status(500).json({ ok: false, error: 'falta configurar Supabase' });
-    return;
-  }
+  if (!(await autorizar(req, res))) return;
 
   let datos;
   try { datos = await leerCuerpo(req); }
@@ -123,6 +103,11 @@ export default async function handler(req, res) {
         body: JSON.stringify(fila),
       }
     );
+    if (r.status === 409) {
+      // Otro envío del mismo pago (mismo uid) llegó primero: ya está guardado.
+      res.status(200).json({ ok: true, id, duplicado: true });
+      return;
+    }
     if (!r.ok) {
       const t = await r.text();
       throw new Error('guardado HTTP ' + r.status + ' ' + t.slice(0, 150));
