@@ -448,6 +448,11 @@
   }
 
   var pendientes = [];
+  function renderEstado() {
+    var txt = pagos.length + ' pago' + (pagos.length === 1 ? '' : 's') + ' guardado' + (pagos.length === 1 ? '' : 's');
+    if (pendientes.length) txt += ' · ⏳ ' + pendientes.length + ' por subir';
+    $('subEstado').textContent = txt;
+  }
   function cargarPendientes() {
     return colaLeer().then(function (lista) {
       pendientes = lista || [];
@@ -473,14 +478,19 @@
     return colaLeer().then(function (lista) {
       pendientes = lista || [];
       return pendientes.reduce(function (cadena, pago) {
-        return cadena.then(function () { return enviarUno(pago); });
+        return cadena.then(function () {
+          return enviarUno(pago).then(function (res) {
+            if (res.tipo === 'error') toast('⚠ Pago ref ' + pago.referencia + ' rechazado: ' + res.msg);
+            else if (res.tipo === 'pin') toast('PIN incorrecto');
+          });
+        });
       }, Promise.resolve());
     }).then(function () {
       return colaLeer();
     }).then(function (lista) {
       pendientes = lista || [];
       var subidos = antes - pendientes.length;
-      if (subidos > 0) toast('☁ Se subieron ' + subidos + ' pago' + (subidos === 1 ? '' : 's') + ' a la PC');
+      if (subidos > 0) toast('☁ Se subieron ' + subidos + ' pago' + (subidos === 1 ? '' : 's') + ' a la nube');
     }).catch(function () {}).then(function () {
       sincronizando = false;
       return actualizarDatos();
@@ -500,6 +510,8 @@
       }, 15000).then(function (r) {
         if (r.status === 401) return { tipo: 'pin' };
         if (r.ok) return { tipo: 'ok' };
+        // Solo un 400 (datos inválidos) es definitivo; 429/5xx se reintentan luego.
+        if (r.status !== 400) return { tipo: 'servidor' };
         return r.json().then(function (d) { return { tipo: 'error', msg: (d && d.error) || 'datos inválidos' }; })
           .catch(function () { return { tipo: 'error', msg: 'datos inválidos' }; });
       }).catch(function () {
@@ -508,10 +520,10 @@
       });
     }
     return intento(1).then(function (res) {
-      if (res.tipo === 'ok') return colaQuitar(pago.uid);
-      if (res.tipo === 'error') return colaQuitar(pago.uid).then(function () { toast('⚠ ' + res.msg); });
-      if (res.tipo === 'pin') { toast('PIN incorrecto'); return; }
-      return;
+      var quitar = function () { return colaQuitar(pago.uid).catch(function () {}); };
+      if (res.tipo === 'ok') return quitar().then(function () { return res; });
+      if (res.tipo === 'error') return quitar().then(function () { return res; });
+      return res;
     });
   }
 
@@ -532,7 +544,12 @@
     fetch('/api/pagos', { headers: { 'X-Pin': val } })
       .then(function (r) {
         if (r.status === 401) { $('pinErr').textContent = 'PIN incorrecto'; return Promise.reject('bad pin'); }
-        if (!r.ok) throw new Error('error');
+        if (!r.ok) {
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            $('pinErr').textContent = d.error || 'Error del servidor';
+            return Promise.reject('error');
+          });
+        }
         return r.json();
       })
       .then(function (datos) {
@@ -543,11 +560,13 @@
         pagos = datos.pagos || [];
         renderTotales(datos.totales || []);
         renderLista();
-        $('subEstado').textContent = pagos.length + ' pagos guardados en tu PC';
+        renderEstado();
         toast('¡Bienvenido/a! 👋');
         arrancarSync();
       })
-      .catch(function () {});
+      .catch(function (e) {
+        if (e !== 'bad pin' && e !== 'error') $('pinErr').textContent = 'Sin conexión. Revisa el internet.';
+      });
   }
   var sesionPin = sessionStorage.getItem('pagos_pin');
   if (sesionPin) {
@@ -559,7 +578,7 @@
         pagos = datos.pagos || [];
         renderTotales(datos.totales || []);
         renderLista();
-        $('subEstado').textContent = pagos.length + ' pagos guardados en tu PC';
+        renderEstado();
         arrancarSync();
       })
       .catch(function () { sessionStorage.removeItem('pagos_pin'); });
@@ -688,7 +707,8 @@
     boton.disabled = true;
     boton.textContent = '⏳ Guardando...';
 
-    var body = {
+    var pago = {
+      uid: nuevoUid(),
       direccion: direccion,
       monto: monto,
       moneda: $(p + '-moneda').value,
@@ -699,27 +719,38 @@
       foto: fotosSeleccionadas[direccion] || null
     };
 
-    fetch('/api/pagar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Pin': PIN },
-      body: JSON.stringify(body)
-    })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-      .then(function (res) {
-        boton.disabled = false;
-        boton.textContent = direccion === 'recibido' ? '✅ Registrar pago recibido' : '✅ Registrar pago realizado';
-        if (!res.ok) { toast(res.d.error || 'Error al guardar'); return; }
-        toast(direccion === 'recibido' ? '✅ Pago recibido guardado' : '✅ Pago realizado guardado');
-        $(p + '-monto').value = '';
-        $(p + '-ref').value = '';
-        $(p + '-nota').value = '';
-        resetFoto(direccion);
-        actualizarDatos();
+    var textoBoton = direccion === 'recibido' ? '✅ Registrar pago recibido' : '✅ Registrar pago realizado';
+    function limpiarFormulario() {
+      $(p + '-monto').value = '';
+      $(p + '-ref').value = '';
+      $(p + '-nota').value = '';
+      resetFoto(direccion);
+    }
+
+    // Primero se guarda en el celular (IndexedDB) y luego se intenta subir:
+    // si no hay internet, el pago queda en la cola y se sube solo después.
+    colaPoner(pago).then(function () { return true; }, function () { return false; })
+      .then(function (enCola) {
+        return enviarUno(pago).then(function (res) { return { res: res, enCola: enCola }; });
       })
-      .catch(function () {
+      .then(function (x) {
+        var res = x.res;
         boton.disabled = false;
-        boton.textContent = direccion === 'recibido' ? '✅ Registrar pago recibido' : '✅ Registrar pago realizado';
-        toast('Sin conexión con la PC');
+        boton.textContent = textoBoton;
+        if (res.tipo === 'ok') {
+          toast(direccion === 'recibido' ? '✅ Pago recibido guardado' : '✅ Pago realizado guardado');
+          limpiarFormulario();
+          actualizarDatos();
+        } else if (res.tipo === 'error') {
+          toast('⚠ ' + res.msg); // datos inválidos: se deja el formulario para corregir
+        } else if (x.enCola) {
+          toast(res.tipo === 'pin' ? '⚠ PIN incorrecto: el pago quedó guardado en el celular'
+            : '📥 Sin conexión: el pago quedó guardado en el celular y se subirá solo');
+          limpiarFormulario();
+          cargarPendientes();
+        } else {
+          toast('Sin conexión y no se pudo guardar en el celular. Intenta de nuevo.');
+        }
       });
   }
 
@@ -734,7 +765,7 @@
         pagos = datos.pagos || [];
         renderTotales(datos.totales || []);
         renderLista();
-        $('subEstado').textContent = pagos.length + ' pagos guardados en tu PC';
+        renderEstado();
       })
       .catch(function () { toast('No se pudo actualizar'); });
   }

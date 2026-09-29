@@ -1,21 +1,23 @@
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
-const APP_PIN = process.env.APP_PIN || '0505';
-const BUCKET = 'foto';
+import { SUPABASE_URL, sbHeaders, autorizar } from './_lib.js';
 
-function pinOk(req) {
-  const header = req.headers['x-pin'] || '';
-  const qs = req.url.split('?')[1] || '';
-  const m = qs.match(/(?:^|&)pin=([^&]+)/);
-  const qpin = m ? decodeURIComponent(m[1]) : '';
-  return String(header) === String(APP_PIN) || String(qpin) === String(APP_PIN);
-}
+const PAGINA = 1000;
 
-function sbHeaders(extra) {
-  return Object.assign(
-    { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY },
-    extra || {}
-  );
+// Supabase devuelve como máximo 1000 filas por consulta: se piden por páginas
+// para que los totales incluyan todos los pagos.
+async function todosLosPagos() {
+  const pagos = [];
+  for (let desde = 0; ; desde += PAGINA) {
+    const r = await fetch(
+      SUPABASE_URL + '/rest/v1/pagos?select=*&order=creado.desc,id.desc',
+      { headers: sbHeaders({ 'Range-Unit': 'items', Range: desde + '-' + (desde + PAGINA - 1) }) }
+    );
+    if (!r.ok) throw new Error('consulta HTTP ' + r.status);
+    const pagina = await r.json();
+    if (!Array.isArray(pagina)) break;
+    pagos.push(...pagina);
+    if (pagina.length < PAGINA) break;
+  }
+  return pagos;
 }
 
 function round2(x) { return Math.round(x * 100) / 100; }
@@ -40,23 +42,11 @@ function calcularTotales(pagos, moneda) {
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
-  if (!pinOk(req)) {
-    res.status(401).json({ ok: false, error: 'PIN incorrecto' });
-    return;
-  }
-  if (!SUPABASE_URL || !SERVICE_KEY) {
-    res.status(500).json({ ok: false, error: 'falta configurar Supabase' });
-    return;
-  }
+  if (!(await autorizar(req, res))) return;
 
   try {
     if (req.method === 'GET') {
-      const r = await fetch(
-        SUPABASE_URL + '/rest/v1/pagos?select=*&order=creado.desc',
-        { headers: sbHeaders() }
-      );
-      if (!r.ok) throw new Error('consulta HTTP ' + r.status);
-      const pagos = await r.json();
+      const pagos = await todosLosPagos();
       const monedas = [...new Set(pagos.map((p) => p.moneda))];
       const totales = monedas.map((m) => calcularTotales(pagos, m));
       res.status(200).json({ ok: true, pagos, totales });
@@ -66,7 +56,8 @@ export default async function handler(req, res) {
     if (req.method === 'DELETE') {
       const qs = req.url.split('?')[1] || '';
       const m = qs.match(/(?:^|&)id=([^&]+)/);
-      const id = m ? decodeURIComponent(m[1]) : '';
+      let id = '';
+      try { id = m ? decodeURIComponent(m[1]) : ''; } catch (e) {}
       if (!id) { res.status(400).json({ ok: false, error: 'falta id' }); return; }
 
       const g = await fetch(
