@@ -130,6 +130,11 @@
   .semana.plegada .sem-cab .flecha { transform:rotate(-90deg); }
   .semana.plegada .sem-cuerpo { display:none; }
   .semana.plegada .sem-cab { margin-bottom:0; }
+  .borrar-sem {
+    width:100%; margin:2px 0 6px; padding:11px; border-radius:12px; cursor:pointer;
+    border:1px solid #e3b4b4; background:#fff5f5; color:#b03a3a; font-size:13px; font-weight:700;
+  }
+  .borrar-sem:active { transform:scale(.98); }
   .sem-tots { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
   .sem-tot {
     flex:1; min-width:130px; background:#eef6f4; border:1px solid var(--borde);
@@ -893,8 +898,14 @@
       var plegada = semanasPlegadas[c] ? ' plegada' : '';
       return '<div class="semana' + plegada + '" data-sem="' + c + '">' +
         '<div class="sem-cab" role="button" tabindex="0"><span>' + titulo + '</span><span class="flecha">▼</span></div>' +
-        '<div class="sem-cuerpo"><div class="sem-tots">' + chips + '</div>' + items + '</div></div>';
+        '<div class="sem-cuerpo"><div class="sem-tots">' + chips + '</div>' + items +
+        '<button class="borrar-sem" data-sem="' + c + '">🗑 Eliminar esta semana (' + lista.length + ' pago' + (lista.length === 1 ? '' : 's') + ')</button>' +
+        '</div></div>';
     }).join('');
+
+    cont.querySelectorAll('.borrar-sem').forEach(function (b) {
+      b.addEventListener('click', function () { eliminarSemana(b.dataset.sem, grupos[b.dataset.sem] || []); });
+    });
 
     cont.querySelectorAll('.sem-cab').forEach(function (cab) {
       cab.addEventListener('click', function () {
@@ -912,6 +923,36 @@
     return String(s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
+  }
+
+  function eliminarSemana(clave, lista) {
+    if (!lista.length) return;
+    var lunes = lunesDe(clave);
+    var domingo = domingoDe(clave);
+    var rango = lunes.getDate() + ' al ' + domingo.getDate() + ' ' + MESES[domingo.getMonth()] + ' ' + domingo.getFullYear();
+    var codigo = String(crypto.getRandomValues(new Uint32Array(1))[0] % 10000).padStart(4, '0');
+    var resp = prompt(
+      'Vas a eliminar la semana del ' + rango + ':\n' +
+      lista.length + ' pago' + (lista.length === 1 ? '' : 's') + ' y sus fotos. Esto NO se puede deshacer.\n\n' +
+      'Para confirmar escribe este código: ' + codigo
+    );
+    if (resp === null) return;
+    if (resp.trim() !== codigo) { toast('Código incorrecto. No se eliminó nada'); return; }
+
+    var borrados = 0;
+    toast('Eliminando semana…');
+    lista.reduce(function (prev, p) {
+      return prev.then(function () {
+        return fetch('/api/pagos?id=' + encodeURIComponent(p.id), { method: 'DELETE', headers: { 'X-Pin': PIN } })
+          .then(function (r) { if (!r.ok) throw new Error(); borrados++; });
+      });
+    }, Promise.resolve())
+      .then(function () { return actualizarDatos(); })
+      .then(function () { toast('Semana eliminada (' + borrados + ' pagos)'); })
+      .catch(function () {
+        actualizarDatos();
+        toast('Se eliminaron ' + borrados + ' de ' + lista.length + '. Intenta de nuevo');
+      });
   }
 
   function eliminar(id) {
