@@ -123,7 +123,13 @@
     background:linear-gradient(135deg,var(--verde),var(--verde-os));
     color:#fff; border-radius:12px; padding:9px 12px; font-size:13.5px;
     font-weight:700; margin-bottom:10px;
+    cursor:pointer; user-select:none; -webkit-user-select:none;
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
   }
+  .sem-cab .flecha { font-size:12px; transition:transform .2s; }
+  .semana.plegada .sem-cab .flecha { transform:rotate(-90deg); }
+  .semana.plegada .sem-cuerpo { display:none; }
+  .semana.plegada .sem-cab { margin-bottom:0; }
   .sem-tots { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
   .sem-tot {
     flex:1; min-width:130px; background:#eef6f4; border:1px solid var(--borde);
@@ -818,6 +824,8 @@
     return d.getFullYear() + '-' + m + '-' + dd;
   }
 
+  var semanasPlegadas = {};
+
   function renderLista() {
     var cont = $('lista');
     var base;
@@ -882,9 +890,19 @@
             '<button class="borrar" data-id="' + p.id + '">🗑 Eliminar</button>' +
           '</div></div>';
       }).join('');
-      return '<div class="semana"><div class="sem-cab">' + titulo + '</div>' +
-        '<div class="sem-tots">' + chips + '</div>' + items + '</div>';
+      var plegada = semanasPlegadas[c] ? ' plegada' : '';
+      return '<div class="semana' + plegada + '" data-sem="' + c + '">' +
+        '<div class="sem-cab" role="button" tabindex="0"><span>' + titulo + '</span><span class="flecha">▼</span></div>' +
+        '<div class="sem-cuerpo"><div class="sem-tots">' + chips + '</div>' + items + '</div></div>';
     }).join('');
+
+    cont.querySelectorAll('.sem-cab').forEach(function (cab) {
+      cab.addEventListener('click', function () {
+        var sem = cab.parentNode;
+        var plegada = sem.classList.toggle('plegada');
+        semanasPlegadas[sem.dataset.sem] = plegada;
+      });
+    });
 
     cont.querySelectorAll('.borrar').forEach(function (b) {
       b.addEventListener('click', function () { eliminar(b.dataset.id); });
