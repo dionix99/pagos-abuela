@@ -130,11 +130,13 @@
   .semana.plegada .sem-cab .flecha { transform:rotate(-90deg); }
   .semana.plegada .sem-cuerpo { display:none; }
   .semana.plegada .sem-cab { margin-bottom:0; }
+  .sem-tit { flex:1; min-width:0; }
+  .sem-acc { display:flex; align-items:center; gap:10px; flex-shrink:0; }
   .borrar-sem {
-    width:100%; margin:2px 0 6px; padding:11px; border-radius:12px; cursor:pointer;
-    border:1px solid #e3b4b4; background:#fff5f5; color:#b03a3a; font-size:13px; font-weight:700;
+    border:1px solid rgba(255,255,255,.55); background:rgba(255,255,255,.16); color:#fff;
+    border-radius:8px; padding:4px 9px; font-size:12px; font-weight:700; cursor:pointer;
   }
-  .borrar-sem:active { transform:scale(.98); }
+  .borrar-sem:active { background:rgba(255,255,255,.32); }
   .sem-tots { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
   .sem-tot {
     flex:1; min-width:130px; background:#eef6f4; border:1px solid var(--borde);
@@ -897,14 +899,17 @@
       }).join('');
       var plegada = semanasPlegadas[c] ? ' plegada' : '';
       return '<div class="semana' + plegada + '" data-sem="' + c + '">' +
-        '<div class="sem-cab" role="button" tabindex="0"><span>' + titulo + '</span><span class="flecha">▼</span></div>' +
+        '<div class="sem-cab" role="button" tabindex="0"><span class="sem-tit">' + titulo + '</span>' +
+        '<span class="sem-acc"><button class="borrar-sem" data-sem="' + c + '" title="Eliminar esta semana">🗑 Eliminar</button><span class="flecha">▼</span></span></div>' +
         '<div class="sem-cuerpo"><div class="sem-tots">' + chips + '</div>' + items +
-        '<button class="borrar-sem" data-sem="' + c + '">🗑 Eliminar esta semana (' + lista.length + ' pago' + (lista.length === 1 ? '' : 's') + ')</button>' +
         '</div></div>';
     }).join('');
 
     cont.querySelectorAll('.borrar-sem').forEach(function (b) {
-      b.addEventListener('click', function () { eliminarSemana(b.dataset.sem, grupos[b.dataset.sem] || []); });
+      b.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        eliminarSemana(b.dataset.sem, grupos[b.dataset.sem] || []);
+      });
     });
 
     cont.querySelectorAll('.sem-cab').forEach(function (cab) {
